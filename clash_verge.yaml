@@ -1,0 +1,433 @@
+#------------------------------------------------#
+#                  Clash 配置                     #
+#------------------------------------------------#
+
+#------------------------------------------------#
+#                  端口设置                     #
+#------------------------------------------------#
+port: 7890              # HTTP 代理端口 (HTTP Proxy Port)
+socks-port: 7891        # SOCKS5 代理端口 (SOCKS5 Proxy Port)
+redir-port: 7892        # 透明代理端口 (Linux/macOS) (Redirect Port)
+mixed-port: 7893        # HTTP 和 SOCKS5 混合端口 (Mixed Port)
+
+#------------------------------------------------#
+#                  常规设置                     #
+#------------------------------------------------#
+allow-lan: true         # 允许来自局域网的连接 (Allow connections from LAN)
+bind-address: "*"       # 监听所有网络接口 (Bind all interfaces)
+                        # 设置为 127.0.0.1 则只允许本机连接 (Set to 127.0.0.1 to allow only local connections)
+mode: rule              # 规则模式 (Rule mode) - Clash 会根据规则判断流量走向
+                        # 可选: global (全局模式), direct (直连模式)
+log-level: info         # 日志输出级别 (Log level)
+                        # 可选: silent, error, warning, info, debug
+ipv6: true             # 是否开启 IPv6 支持 (Enable IPv6) - 根据你的网络环境决定
+
+#------------------------------------------------#
+#               外部控制器设置                   #
+#------------------------------------------------#
+# 用于连接 Clash Dashboard 或其他控制软件
+external-controller: 127.0.0.1:9090 # 控制器监听地址和端口 (Controller address and port)
+# secret: "your_secret_password"  # 可选：设置访问密码 (Optional: Set access password)
+
+#------------------------------------------------#
+#                  DNS 设置                      #
+#------------------------------------------------#
+dns:
+  enable: true            # 启用 Clash 内建 DNS 服务器 (Enable built-in DNS server)
+  ipv6: true             # 是否查询 AAAA 记录 (Query AAAA records)
+  listen: 127.0.0.1:53      # DNS 监听地址和端口 (DNS listen address and port)
+                          # 0.0.0.0 表示监听所有 IP，方便局域网设备使用
+                          # 如果只本机使用，可改为 127.0.0.1:53
+  enhanced-mode: fake-ip  # DNS 模式: fake-ip 或 redir-host (DNS mode)
+  fake-ip-range: 198.18.0.1/16 # Fake IP 地址池范围 (Fake IP range)
+  # Fake IP 过滤器，匹配的域名不会返回 Fake IP
+  fake-ip-filter:
+    - "*.lan"             # 局域网域名
+    - localhost.ptlogin2.qq.com
+    - "*.srv.nintendo.net"
+    - "*.stun.playstation.net"
+    - "*.msftconnecttest.com"
+    - "*.msftncsi.com"
+    - "*.xboxlive.com"
+    - "msftconnecttest.com"
+    - "xbox.*.microsoft.com"
+    - "*.battlenet.com.cn"
+    - "*.battlenet.com"
+    - "*.blzstatic.cn"
+    - "*.battle.net"
+    - "lens.l.google.com" # 避免 Google Lens 问题
+    - "stun.*.*"
+    - "stun.*.*.*"
+
+  # 上游 DNS 服务器
+  nameserver:
+    - 223.5.5.5           # AliDNS (国内常用)
+    - 119.29.29.29        # DNSPod (国内常用)
+    - https://doh.pub/dns-query # Tencent DoH
+    - https://dns.alidns.com/dns-query # AliDNS DoH
+
+  # 备用 DNS 服务器 (通常用于解析国外域名)
+  fallback:
+    - https://cloudflare-dns.com/dns-query # Cloudflare DoH
+    - https://dns.google/dns-query         # Google DoH
+    - tls://1.0.0.1:853                    # Cloudflare DoT
+    - tls://8.8.4.4:853                    # Google DoT
+
+  # Fallback DNS 过滤器，匹配的域名会使用 fallback DNS 解析
+  fallback-filter:
+    geoip: true           # 启用 GeoIP 数据库判断
+    geoip-code: CN        # 非 CN 的 IP 地址的域名查询将使用 Fallback DNS
+    ipcidr:               # 在这些 IP 段内的域名查询将使用 Fallback DNS
+      - 240.0.0.0/4       # 例如保留地址段
+    # domain:             # 匹配的域名使用 Fallback DNS (可选)
+    #   - '+.google.com'
+    #   - '+.facebook.com'
+    #   - '+.twitter.com'
+
+#------------------------------------------------#
+#                YAML 锚点和别名                 #
+#------------------------------------------------#
+# 用于简化后续 proxy-group 和 rule-provider 的配置
+# (YAML Anchors and Aliases for simplification)
+
+# --- 代理组模板 (Proxy Group Templates) ---
+pr: # 基础 Select 组模板 (Basic Select Group Template)
+  &a3
+  type: select # 手动选择类型 (Manual selection type)
+  proxies:
+    # 这里的顺序会影响 UI 中的默认显示顺序
+    - 🚀 手动切换   # 指向包含所有节点的 'use' 类型组
+    - ♻️ 自动选择   # 指向 'url-test' 类型组
+    - 🇭🇰 香港节点
+    - 🇯🇵 日本节点
+    - 🇺🇲 美国节点
+    - 🇨🇳 台湾节点
+    - 🇸🇬 狮城节点
+    - DIRECT       # 直连选项
+    - REJECT       # 拒绝连接选项 (可选，用于特定规则)
+
+auto: # URL Test 组模板 (URL Test Group Template)
+  &a4
+  type: url-test # 自动测试延迟并选择最快节点 (Auto speed test and select the fastest)
+  url: http://www.gstatic.com/generate_204 # 延迟测试 URL (Latency test URL)
+  interval: 900    # 自动测试间隔 (秒) (Auto test interval in seconds)
+  lazy: true       # 惰性测试，只有在使用时才测试 (Lazy test, only test when used)
+  # tolerance: 50 # 可选：增加延迟容差，单位毫秒，防止频繁切换 (Optional: Add tolerance in ms to prevent frequent switching)
+  use: [Subscribe] # 从名为 'Subscribe' 的 provider 获取节点进行测试
+
+use: # 使用 Provider 的 Select 组模板 (Select Group using Provider Template)
+  &a2
+  type: select     # 手动选择类型
+  use: [Subscribe] # 从名为 'Subscribe' 的 provider 获取节点列表
+
+# --- 代理/规则提供者模板 (Proxy/Rule Provider Templates) ---
+p: # 基础 HTTP 代理提供者模板 (Basic HTTP Proxy Provider Template)
+  &a1
+  type: http
+  interval: 86400  # 自动更新间隔 (秒)，86400 = 24小时
+  health-check:
+    enable: true
+    url: http://www.gstatic.com/generate_204 # 健康检查 URL
+    interval: 1800 # 健康检查间隔 (秒)
+
+c: # Classical 规则提供者模板 (Classical Rule Provider Template)
+  &a6
+  type: http
+  behavior: classical # 匹配行为: classical (兼容 Surge 的 Domain-Suffix, Domain-Keyword, IP-CIDR)
+  interval: 86400
+
+d: # Domain 规则提供者模板 (Domain Rule Provider Template)
+  &a5
+  type: http
+  behavior: domain   # 匹配行为: domain (兼容 Surge 的 Domain, Domain-Suffix)
+  interval: 86400
+
+i: # IP-CIDR 规则提供者模板 (IP-CIDR Rule Provider Template)
+  &a7
+  type: http
+  behavior: ipcidr   # 匹配行为: ipcidr (兼容 Surge 的 IP-CIDR, IP-CIDR6)
+  interval: 86400
+
+#------------------------------------------------#
+#                代理提供者设置                   #
+#------------------------------------------------#
+# 从订阅链接或其他来源获取节点列表
+proxy-providers:
+  Subscribe:
+    <<: *a1 # 应用 &a1 模板 (Apply &a1 template)
+    # !!! 安全警告 !!!
+    # !!! 请勿在此处直接粘贴包含 Token 的完整订阅链接 !!!
+    # !!! 请在 Clash 客户端 UI 中添加或更新订阅，或使用环境变量等安全方式 !!!
+    # !!! Your subscription URL with token should NOT be hardcoded here for security reasons! !!!
+    # !!! Add/Update it in your Clash client UI or use secure methods like environment variables. !!!
+    url: https://ratchada.terminal69.win/api/v1/trails/bolster?token=cf55ca5c67e03a593c6fa1a0785ace6a # <--- 在这里填入你的 Clash 订阅链接 (或者留空，在 UI 中添加)
+    path: ./proxy_providers/subscribe_nodes.yaml # 节点列表缓存文件路径 (Cache file path)
+    # 可选：对节点进行过滤或重命名 (Optional: Filter or rename nodes)
+    # filter: "(?i)香港|HK" # 只保留包含 '香港' 或 'HK' (不区分大小写) 的节点
+    # exclude-filter: "(?i)过期|流量" # 排除包含 '过期' 或 '流量' 的节点
+
+#------------------------------------------------#
+#                   代理节点                     #
+#------------------------------------------------#
+# 通常留空，节点由 proxy-providers 提供
+# (Usually leave it null, nodes are provided by proxy-providers)
+proxies: null
+
+#------------------------------------------------#
+#                   代理组设置                   #
+#------------------------------------------------#
+# 定义策略组和节点组
+proxy-groups:
+  # --- 策略组 (用于规则匹配) ---
+  # Policy Groups (Used in rules)
+
+  - name: 🚀 手动切换   # 包含所有节点的组，用于手动选择
+    <<: *a2         # 应用 &a2 模板 (Select, use: [Subscribe])
+
+  - name: 🌏 全球加速   # 通用代理组，默认自动选择或手动切换
+    <<: *a3         # 应用 &a3 模板 (Select, proxies: [手动切换, 自动选择, ... DIRECT])
+
+  - name: 🍎 苹果服务   # Apple 服务专用
+    <<: *a3
+
+  - name: 📺 哔哩哔哩   # BiliBili 专用，优先直连港台
+    type: select
+    proxies:
+      - DIRECT
+      - 🇭🇰 香港节点
+      - 🇨🇳 台湾节点
+      # - ♻️ 自动选择 # 如果港台不可用，可以考虑自动选择其他节点
+
+  - name: 🤖 Ai 服务    # AI 服务 (如 OpenAI)，锁定使用美国节点
+    type: select
+    proxies:
+      - 🇺🇲 美国节点 # 【已修改】仅保留美国节点选项
+
+  - name: 🎵 Spotify    # Spotify 专用，锁定使用美国节点
+    type: select
+    proxies:
+      - 🇺🇲 美国节点 # 【已修改】仅保留美国节点选项
+
+  - name: 🎬 Netflix    # Netflix 专用 (示例，需配合规则)
+    type: select
+    proxies:
+      # --- 根据你想看的 Netflix 区域调整节点顺序 ---
+      # --- Adjust node order based on the Netflix region you want to watch ---
+      - 🇺🇲 美国节点
+      - 🇯🇵 日本节点
+      - 🇭🇰 香港节点
+      - 🇸🇬 狮城节点
+      - 🇨🇳 台湾节点
+      - ♻️ 自动选择   # 自动选择可用的解锁节点
+      # - 🚀 手动切换 # 或者允许手动选择任意节点
+
+  - name: 🌌 谷歌服务   # Google 服务专用
+    <<: *a3
+
+  - name: 📟 电报消息   # Telegram 专用
+    <<: *a3
+
+  - name: 🐦 推特服务   # Twitter 专用
+    <<: *a3
+
+  - name: 🎮 游戏平台   # 游戏平台专用 (Steam, PSN, Xbox etc.)
+    <<: *a3
+
+  - name: 🆎 AdBlock    # 广告屏蔽，直接拒绝连接
+    type: select
+    proxies:
+      - REJECT       # 拒绝连接
+      # - DIRECT     # 如果你想放行某些广告，可以加 DIRECT，但不推荐
+
+  - name: 🐟 兜底分流   # 所有未匹配规则的流量最终走向这里
+    <<: *a3
+
+  # --- 节点组 (按地区或类型筛选节点) ---
+  # Node Groups (Filter nodes by region or type)
+
+  - name: ♻️ 自动选择   # 自动延迟测试选择最优节点
+    <<: *a4         # 应用 &a4 模板 (url-test, use: [Subscribe])
+
+  - name: 🇭🇰 香港节点   # 手动/自动选择香港节点
+    <<: *a4         # 默认自动选择香港节点 (url-test)
+    # <<: *a2       # 如果想手动选择香港节点，取消注释这行，注释掉上一行
+    filter: "(?i)港|hk|hong" # 正则表达式筛选包含关键字的节点 (不区分大小写)
+
+  - name: 🇯🇵 日本节点   # 手动/自动选择日本节点
+    <<: *a4
+    # <<: *a2
+    filter: "(?i)日本|东京|jp|japan"
+
+  - name: 🇨🇳 台湾节点   # 手动/自动选择台湾节点
+    <<: *a4
+    # <<: *a2
+    filter: "(?i)台|湾|tw|taiwan"
+
+  - name: 🇺🇲 美国节点   # 手动/自动选择美国节点
+    <<: *a4
+    # <<: *a2
+    filter: "(?i)美国|us|states|american"
+
+  - name: 🇸🇬 狮城节点   # 手动/自动选择新加坡节点
+    <<: *a4
+    # <<: *a2
+    filter: "(?i)新加坡|狮城|sg|singapore"
+
+#------------------------------------------------#
+#                 规则提供者设置                 #
+#------------------------------------------------#
+# 从 URL 下载规则列表
+rule-providers:
+  # 广告屏蔽规则 (Ad Blocking Rules)
+  Ad:
+    <<: *a5 # Domain 行为 (Domain behavior)
+    url: https://raw.githubusercontent.com/Cats-Team/AdRules/main/adrules_domainset.txt
+    path: ./ruleset/Ad_domain.yaml # 缓存路径
+
+  # AI 服务规则 (AI Service Rules)
+  Ai:
+    <<: *a6 # Classical 行为
+    url: https://gist.githubusercontent.com/ddgksf2013/cb4121e8b5c5d865cc949cb8120320c4/raw/Ai.yaml
+    path: ./ruleset/Ai.yaml
+
+  # BiliBili 规则
+  BiliBili:
+    <<: *a6
+    url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/BiliBili/BiliBili.yaml
+    path: ./ruleset/BiliBili.yaml
+
+  # Spotify 规则
+  Spotify:
+    <<: *a6
+    url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Spotify/Spotify.yaml
+    path: ./ruleset/Spotify.yaml
+
+  # 巴哈姆特规则 (台湾动画/游戏社区)
+  Bahamut:
+    <<: *a6
+    url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Bahamut/Bahamut.yaml
+    path: ./ruleset/Bahamut.yaml
+
+  # Apple 服务规则
+  Apple:
+    <<: *a6
+    url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Apple/Apple_Classical.yaml
+    path: ./ruleset/Apple.yaml
+
+  # Github 规则
+  Github:
+    <<: *a6
+    url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/GitHub/GitHub.yaml
+    path: ./ruleset/Github.yaml
+
+  # Microsoft 服务规则
+  Microsoft:
+    <<: *a6
+    url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Microsoft/Microsoft.yaml
+    path: ./ruleset/Microsoft.yaml
+
+  # Google 服务规则
+  Google:
+    <<: *a6
+    url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Google/Google.yaml
+    path: ./ruleset/Google.yaml
+
+  # Jetbrains 规则 (IDE 开发工具)
+  Jetbrains:
+    <<: *a6
+    url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Jetbrains/Jetbrains.yaml
+    path: ./ruleset/Jetbrains.yaml
+
+  # Telegram 规则
+  Telegram:
+    <<: *a6
+    url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Telegram/Telegram.yaml
+    path: ./ruleset/Telegram.yaml
+
+  # Twitter 规则
+  Twitter:
+    <<: *a6
+    url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Twitter/Twitter.yaml
+    path: ./ruleset/Twitter.yaml
+
+  # 游戏相关规则 (Game Rules)
+  Game:
+    <<: *a6
+    url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Game/Game.yaml
+    path: ./ruleset/Game.yaml
+
+  # Netflix 规则
+  Netflix:
+    <<: *a6 # Classical 行为
+    url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Netflix/Netflix.yaml
+    path: ./ruleset/Netflix.yaml # 缓存路径
+
+  # 代理规则 (需要走代理的常见域名)
+  ProxyLite:
+    <<: *a6
+    url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/ProxyLite/ProxyLite.yaml
+    path: ./ruleset/ProxyLite.yaml
+
+  # 直连规则 (常见国内服务/域名)
+  Direct:
+    <<: *a6
+    url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Direct/Direct.yaml
+    path: ./ruleset/Direct.yaml
+
+  # 局域网规则 (LAN Rules)
+  Lan:
+    <<: *a6
+    url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Lan/Lan.yaml
+    path: ./ruleset/Lan.yaml
+
+  # 下载相关规则 (Download Rules) - 通常建议直连
+  Download:
+    <<: *a6
+    url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Download/Download.yaml
+    path: ./ruleset/Download.yaml
+
+  # 中国大陆 IP 段规则 (China IP Range Rules)
+  ChinaIP:
+    <<: *a7 # IP-CIDR 行为
+    url: https://cdn.jsdelivr.net/gh/soffchen/GeoIP2-CN@release/clash-rule-provider.yml
+    path: ./ruleset/ChinaIP.yaml
+
+#------------------------------------------------#
+#                   规则定义                     #
+#------------------------------------------------#
+# 规则匹配顺序：从上到下，匹配即停止
+# (Rule matching order: Top to bottom, stops at first match)
+rules:
+  # --- 广告屏蔽 ---
+  - RULE-SET,Ad,🆎 AdBlock # 广告域名，拒绝连接
+
+  # --- 特定应用/服务分流 ---
+  - RULE-SET,Ai,🤖 Ai 服务
+  - RULE-SET,Spotify,🎵 Spotify
+  - RULE-SET,Netflix,🎬 Netflix   # Netflix 规则放在前面
+  - RULE-SET,BiliBili,📺 哔哩哔哩
+  - RULE-SET,Bahamut,📺 哔哩哔哩 # 巴哈姆特也走 B 站策略组 (港台优先)
+  - RULE-SET,Apple,🍎 苹果服务
+  - RULE-SET,Github,🌏 全球加速 # Github 走通用代理
+  - RULE-SET,Microsoft,DIRECT # Microsoft 服务走通用代理
+  - RULE-SET,Jetbrains,DIRECT     # Jetbrains 服务直连
+  - RULE-SET,Google,🌌 谷歌服务
+  - RULE-SET,Telegram,📟 电报消息
+  - RULE-SET,Twitter,🐦 推特服务 # Twitter 走通用代理
+  - RULE-SET,Game,🎮 游戏平台
+  # - RULE-SET,Disney,🐭 Disney+   # 如果启用了 Disney+ 规则和组
+
+  # --- 通用规则 ---
+  - RULE-SET,ProxyLite,🌏 全球加速 # 明确需要代理的域名
+  - RULE-SET,Direct,DIRECT       # 明确需要直连的域名
+  - RULE-SET,Lan,DIRECT          # 局域网地址直连
+  - RULE-SET,Download,DIRECT     # 下载类域名直连
+
+  # --- 地理位置规则 ---
+  - RULE-SET,ChinaIP,DIRECT      # 中国大陆 IP 地址直连
+  - GEOIP,CN,DIRECT              # 目标 IP 属地为中国则直连 (作为 ChinaIP 的补充)
+
+  # --- 兜底规则 ---
+  # 所有未被以上规则匹配的流量，将使用此规则
+  - IP-CIDR,8.217.42.111/32,DIRECT
+  - MATCH,🐟 兜底分流           # 最终匹配，走兜底策略组
