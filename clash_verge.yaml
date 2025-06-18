@@ -160,7 +160,7 @@ proxy-providers:
     # !!! 请在 Clash 客户端 UI 中添加或更新订阅，或使用环境变量等安全方式 !!!
     # !!! Your subscription URL with token should NOT be hardcoded here for security reasons! !!!
     # !!! Add/Update it in your Clash client UI or use secure methods like environment variables. !!!
-    url: https://ratchada.terminal69.win/api/v1/trails/bolster?token=cf55ca5c67e03a593c6fa1a0785ace6a # <--- 在这里填入你的 Clash 订阅链接 (或者留空，在 UI 中添加)
+    url:  # <--- 在这里填入你的 Clash 订阅链接 (或者留空，在 UI 中添加)
     path: ./proxy_providers/subscribe_nodes.yaml # 节点列表缓存文件路径 (Cache file path)
     # 可选：对节点进行过滤或重命名 (Optional: Filter or rename nodes)
     # filter: "(?i)香港|HK" # 只保留包含 '香港' 或 'HK' (不区分大小写) 的节点
@@ -189,6 +189,9 @@ proxy-groups:
 
   - name: 🍎 苹果服务   # Apple 服务专用
     <<: *a3
+    
+  - name: 🎨 Adobe 服务   # Adobe 专用
+    <<: *a3         # 应用 &a3 模板，允许手动/自动/直连
 
   - name: 📺 哔哩哔哩   # BiliBili 专用，优先直连港台
     type: select
@@ -264,8 +267,8 @@ proxy-groups:
     filter: "(?i)台|湾|tw|taiwan"
 
   - name: 🇺🇲 美国节点   # 手动/自动选择美国节点
-    <<: *a4
-    # <<: *a2
+    # <<: *a4
+    <<: *a2
     filter: "(?i)美国|us|states|american"
 
   - name: 🇸🇬 狮城节点   # 手动/自动选择新加坡节点
@@ -289,6 +292,12 @@ rule-providers:
     <<: *a6 # Classical 行为
     url: https://gist.githubusercontent.com/ddgksf2013/cb4121e8b5c5d865cc949cb8120320c4/raw/Ai.yaml
     path: ./ruleset/Ai.yaml
+    
+  # Adobe 规则
+  Adobe:
+    <<: *a6
+    url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Adobe/Adobe.yaml
+    path: ./ruleset/Adobe.yaml
 
   # BiliBili 规则
   BiliBili:
@@ -402,6 +411,7 @@ rules:
   - RULE-SET,Ad,🆎 AdBlock # 广告域名，拒绝连接
 
   # --- 特定应用/服务分流 ---
+  - RULE-SET,Adobe,🎨 Adobe 服务
   - RULE-SET,Ai,🤖 Ai 服务
   - RULE-SET,Spotify,🎵 Spotify
   - RULE-SET,Netflix,🎬 Netflix   # Netflix 规则放在前面
